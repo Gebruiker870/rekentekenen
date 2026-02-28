@@ -213,6 +213,7 @@ def get_color_name(r: float, g: float, b: float) -> str:
 
     if max_c == r:
         if g > 200 and b < 80:  return "Geel"
+        if g > r * 0.75:        return "Geel"   # geel: groen bijna even hoog als rood
         if g > 80:              return "Oranje"
         if b > r * 0.7:         return "Paars"
         if b > 120:             return "Roze"
