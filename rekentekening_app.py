@@ -442,7 +442,7 @@ if img_mode == "Specifiek nummer":
     img_choice = st.slider("Afbeeldingsnummer:", min_value=1, max_value=MAX_IMAGE_NUMBER, value=1)
     preview_path = os.path.join(IMAGES_DIR, f"{img_choice}.png")
     if os.path.exists(preview_path):
-        st.image(preview_path, caption=f"Afbeelding {img_choice}")
+        st.image(preview_path)
     else:
         st.warning(f"Afbeelding {img_choice} niet gevonden.")
 elif img_mode == "Eigen afbeelding uploaden":
