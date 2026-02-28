@@ -369,15 +369,18 @@ def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_color
         if uploaded_image is not None and page_num == 0:
             image_source = uploaded_image
         else:
-            if img_choice == 0 or num_pages > 1:
+            # Eerste pagina: gebruik specifieke keuze indien opgegeven
+            # Volgende pagina's: willekeurig (zonder herhaling)
+            if img_choice != 0 and page_num == 0:
+                img_num = img_choice
+                used_images.append(img_num)
+            else:
                 available = [i for i in range(1, MAX_IMAGE_NUMBER + 1) if i not in used_images]
                 if not available:
                     used_images.clear()
                     available = list(range(1, MAX_IMAGE_NUMBER + 1))
                 img_num = random.choice(available)
                 used_images.append(img_num)
-            else:
-                img_num = img_choice
 
             image_path = os.path.join(IMAGES_DIR, f"{img_num}.png")
             if not os.path.exists(image_path):
