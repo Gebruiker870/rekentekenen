@@ -241,7 +241,7 @@ _text_length_cache: dict = {}
 def _text_len(text: str, fontname: str, fontsize: float) -> float:
     key = (text, fontname, round(fontsize, 2))
     if key not in _text_length_cache:
-        _text_length_cache[key] = _text_len(text, fontname=fontname, fontsize=fontsize)
+        _text_length_cache[key] = fitz.get_text_length(text, fontname=fontname, fontsize=fontsize)
     return _text_length_cache[key]
 
 # Zoek het font eenmalig op bij het laden van de app
