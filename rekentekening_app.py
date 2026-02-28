@@ -289,18 +289,24 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
     grid_y = MARGIN + max(0, (available_h - total_h) // 2)
     grid_x = MARGIN
 
-    # ── Matrix ────────────────────────────────────────────────────────────────
+    # ── Matrix (batch via Shape voor snelheid) ───────────────────────────────
+    fs = cell_size * 0.55
+    shape = page.new_shape()
     for r in range(rows):
         for c in range(cols):
             cluster = int(matrix[r][c])
-            answer  = str(answer_matrix[r][c])
             x0, y0  = grid_x + c * cell_size, grid_y + r * cell_size
             x1, y1  = x0 + cell_size, y0 + cell_size
-
             fill = cluster_colors.get(cluster, (1, 1, 1)) if show_colors else (1, 1, 1)
-            page.draw_rect(fitz.Rect(x0, y0, x1, y1), color=(0.5, 0.5, 0.5), fill=fill, width=0.5)
+            shape.draw_rect(fitz.Rect(x0, y0, x1, y1))
+            shape.finish(color=(0.5, 0.5, 0.5), fill=fill, width=0.5)
+    shape.commit()
 
-            fs = cell_size * 0.55
+    # Tekst apart (moet na shapes)
+    for r in range(rows):
+        for c in range(cols):
+            answer  = str(answer_matrix[r][c])
+            x0, y0  = grid_x + c * cell_size, grid_y + r * cell_size
             tw = _text_len(answer, fontname=MEASURE_FONT_B, fontsize=fs)
             page.insert_text(
                 (x0 + (cell_size - tw) / 2, y0 + cell_size / 2 + fs * 0.35),
@@ -344,10 +350,10 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         color_name = get_color_name(cr, cg, cb)
         name_w = _text_len(color_name, fontname=MEASURE_FONT_B, fontsize=EX_FONTSIZE)
 
-        page.draw_rect(
-            fitz.Rect(x_start, ex_y + 2, x_start + color_col_w, ex_y + ROW_HEIGHT - 2),
-            color=None, fill=(cr, cg, cb), width=0
-        )
+        shape2 = page.new_shape()
+        shape2.draw_rect(fitz.Rect(x_start, ex_y + 2, x_start + color_col_w, ex_y + ROW_HEIGHT - 2))
+        shape2.finish(color=None, fill=(cr, cg, cb), width=0)
+        shape2.commit()
         luminance = 0.299 * cr + 0.587 * cg + 0.114 * cb
         page.insert_text(
             (x_start + (color_col_w - name_w) / 2, ex_y + 16),
@@ -378,18 +384,19 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
 # ── PDF GENEREREN ─────────────────────────────────────────────────────────────
 
 def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_colors: bool,
-                 uploaded_image=None, show_answers: bool = False, num_exercises: int = NUM_EXERCISES) -> bytes:
+                 uploaded_image=None, show_answers: bool = False, num_exercises: int = NUM_EXERCISES,
+                 progress_bar=None) -> bytes:
     """Genereer het volledige PDF-document en geef het terug als bytes."""
     doc = fitz.open()
     used_images = []
 
     for page_num in range(num_pages):
-        # Gebruik geüploade afbeelding voor de eerste pagina
+        if progress_bar is not None:
+            progress_bar.progress((page_num) / num_pages, text=f"Pagina {page_num + 1} van {num_pages}...")
+        # Afbeeldingsbron bepalen
         if uploaded_image is not None and page_num == 0:
             image_source = uploaded_image
         else:
-            # Eerste pagina: gebruik specifieke keuze indien opgegeven
-            # Volgende pagina's: willekeurig (zonder herhaling)
             if img_choice != 0 and page_num == 0:
                 img_num = img_choice
                 used_images.append(img_num)
@@ -407,14 +414,14 @@ def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_color
             image_source = image_path
 
         matrix, cluster_colors = process_image(image_source)
-        exercises     = generate_math_exercises(user_numbers["mult"], user_numbers["div"], num_clusters=len(cluster_colors), num_exercises=num_exercises)
-        answer_matrix = populate_matrix(matrix, exercises, num_clusters=len(cluster_colors))
+        num_clusters = len(cluster_colors)
+        exercises     = generate_math_exercises(user_numbers["mult"], user_numbers["div"],
+                                                num_clusters=num_clusters, num_exercises=num_exercises)
+        answer_matrix = populate_matrix(matrix, exercises, num_clusters=num_clusters)
 
         if show_answers:
-            # Pagina 1: zonder kleur en zonder oplossingen (voor de leerling)
             draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors,
                       show_colors=False, show_answers=False)
-            # Pagina 2: met kleur en met oplossingen (antwoordblad)
             draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors,
                       show_colors=True, show_answers=True)
         else:
@@ -490,11 +497,14 @@ if st.button("✏️ Genereer Rekentekening!"):
     if not selected["mult"] and not selected["div"]:
         st.error("Kies minstens één maaltafel of deeltafel!")
     else:
-        with st.spinner("Bezig met genereren..."):
-            if img_mode == "Eigen afbeelding uploaden" and uploaded_image is None:
-                st.error("Upload eerst een afbeelding!")
-                st.stop()
-            pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors, uploaded_image=uploaded_image, show_answers=show_answers, num_exercises=num_exercises)
+        if img_mode == "Eigen afbeelding uploaden" and uploaded_image is None:
+            st.error("Upload eerst een afbeelding!")
+            st.stop()
+        progress = st.progress(0, text="Bezig met genereren...")
+        pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors,
+                                  uploaded_image=uploaded_image, show_answers=show_answers,
+                                  num_exercises=num_exercises, progress_bar=progress)
+        progress.empty()
 
         all_selected = sorted(set(selected["mult"] + selected["div"]))
         tafel_str = ", ".join(str(n) for n in all_selected)
