@@ -308,7 +308,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         f"{tafel_word} van {numbers_str}!", fontname=font_br, fontsize=TITLE_FONTSIZE, color=(0, 0, 0))
 
     base_y = grid_y + 14 + (TITLE_FONTSIZE + 4) * 2
-    for i, line in enumerate(["", "Los alle sommen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
+    for i, line in enumerate(["", "Los alle oefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
         page.insert_text((instr_x, base_y + i * LINE_H), line, fontname=font_r, fontsize=INSTR_FONTSIZE, color=(0, 0, 0))
 
     # ── Oefeningen in 2 kolommen ──────────────────────────────────────────────
