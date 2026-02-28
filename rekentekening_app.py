@@ -83,6 +83,7 @@ st.markdown("""
 
 # ── AFBEELDING VERWERKEN ──────────────────────────────────────────────────────
 
+@st.cache_data
 def process_image(image_source, max_size: int = MAX_IMAGE_SIZE):
     """Laad een afbeelding (pad of bestand), reduceer naar max_size en extraheer kleurclusters."""
     image = Image.open(image_source)
@@ -197,6 +198,7 @@ def populate_matrix(matrix: np.ndarray, exercises: list, num_clusters: int = 8):
 
 # ── KLEURNAAM BEPALEN ─────────────────────────────────────────────────────────
 
+@st.cache_data
 def get_color_name(r: float, g: float, b: float) -> str:
     """Geeft een Nederlandse kleurnaam terug op basis van RGB-waarden (0–1 bereik)."""
     r, g, b = r * 255, g * 255, b * 255
@@ -233,15 +235,31 @@ def get_color_name(r: float, g: float, b: float) -> str:
 
 # ── PDF PAGINA TEKENEN ────────────────────────────────────────────────────────
 
+# Cache voor fitz.get_text_length (wordt honderden keren aangeroepen per pagina)
+_text_length_cache: dict = {}
+
+def _text_len(text: str, fontname: str, fontsize: float) -> float:
+    key = (text, fontname, round(fontsize, 2))
+    if key not in _text_length_cache:
+        _text_length_cache[key] = _text_len(text, fontname=fontname, fontsize=fontsize)
+    return _text_length_cache[key]
+
+# Zoek het font eenmalig op bij het laden van de app
+_PLAYFUL_FONT_PATH = None
+for _path in FONT_CANDIDATES:
+    if os.path.exists(_path):
+        _PLAYFUL_FONT_PATH = _path
+        break
+
+
 def _load_playful_font(page) -> tuple:
     """Laadt een speels TTF-lettertype indien beschikbaar, anders Helvetica."""
-    for path in FONT_CANDIDATES:
-        if os.path.exists(path):
-            try:
-                page.insert_font(fontname="playfont", fontfile=path)
-                return "playfont", "playfont"
-            except Exception:
-                pass
+    if _PLAYFUL_FONT_PATH:
+        try:
+            page.insert_font(fontname="playfont", fontfile=_PLAYFUL_FONT_PATH)
+            return "playfont", "playfont"
+        except Exception:
+            pass
     return "helv", "hebo"
 
 
@@ -283,7 +301,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
             page.draw_rect(fitz.Rect(x0, y0, x1, y1), color=(0.5, 0.5, 0.5), fill=fill, width=0.5)
 
             fs = cell_size * 0.55
-            tw = fitz.get_text_length(answer, fontname=MEASURE_FONT_B, fontsize=fs)
+            tw = _text_len(answer, fontname=MEASURE_FONT_B, fontsize=fs)
             page.insert_text(
                 (x0 + (cell_size - tw) / 2, y0 + cell_size / 2 + fs * 0.35),
                 answer, fontname=font_r, fontsize=fs, color=(0, 0, 0)
@@ -318,13 +336,13 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
     left_col, right_col = exercises[:half], exercises[half:]
 
     all_names = [get_color_name(*cluster_colors.get(cl, (0, 0, 0))) for cl, _, _ in exercises]
-    color_col_w = max(fitz.get_text_length(n, fontname=MEASURE_FONT_B, fontsize=EX_FONTSIZE) for n in all_names) + 8
+    color_col_w = max(_text_len(n, fontname=MEASURE_FONT_B, fontsize=EX_FONTSIZE) for n in all_names) + 8
 
     def draw_exercise(ex, x_start, ex_y, col_w):
         cluster, answer, text = ex
         cr, cg, cb = cluster_colors.get(cluster, (0, 0, 0))
         color_name = get_color_name(cr, cg, cb)
-        name_w = fitz.get_text_length(color_name, fontname=MEASURE_FONT_B, fontsize=EX_FONTSIZE)
+        name_w = _text_len(color_name, fontname=MEASURE_FONT_B, fontsize=EX_FONTSIZE)
 
         page.draw_rect(
             fitz.Rect(x_start, ex_y + 2, x_start + color_col_w, ex_y + ROW_HEIGHT - 2),
@@ -340,7 +358,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         ex_x = x_start + color_col_w + 6
         label = text.replace("= ?", "=")
         page.insert_text((ex_x, ex_y + 16), label, fontname=font_r, fontsize=EX_FONTSIZE, color=(0, 0, 0))
-        label_w = fitz.get_text_length(label, fontname=MEASURE_FONT, fontsize=EX_FONTSIZE)
+        label_w = _text_len(label, fontname=MEASURE_FONT, fontsize=EX_FONTSIZE)
         if show_answers:
             # Schrijf het antwoord in het zwart na het = teken
             ans_str = str(answer)
