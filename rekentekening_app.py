@@ -430,7 +430,12 @@ st.markdown("### 📄 Stap 3 — Hoeveel pagina's?")
 num_pages = st.slider("Aantal pagina's:", min_value=1, max_value=20, value=1)
 
 st.markdown("### ⚙️ Opties")
-show_colors = st.toggle("Toon kleuren in de matrix", value=True)
+show_answers = st.toggle("Genereer ook een antwoordblad (2 pagina's per afbeelding)", value=False)
+if not show_answers:
+    show_colors = st.toggle("Toon kleuren in de matrix", value=False)
+else:
+    show_colors = False
+    st.info("📄 Per afbeelding worden 2 pagina's gegenereerd: een werkblad (zonder kleur) en een antwoordblad (met kleur en oplossingen).")
 
 st.markdown("---")
 
