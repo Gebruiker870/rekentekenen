@@ -119,21 +119,30 @@ def process_image(image_source, max_size: int = MAX_IMAGE_SIZE):
 
 # ── OEFENINGEN GENEREREN ──────────────────────────────────────────────────────
 
-def generate_math_exercises(user_numbers: list, num_clusters: int = 8, num_exercises: int = NUM_EXERCISES):
+def generate_math_exercises(mult_numbers: list, div_numbers: list, num_clusters: int = 8, num_exercises: int = NUM_EXERCISES):
     """Genereer unieke vermenigvuldigings- en deelsommen voor de opgegeven tafels."""
     seen = set()
     exercises = []
     answer_to_group = {}
     group_counter = 1
 
+    available_ops = []
+    if mult_numbers:
+        available_ops.append("multiplication")
+    if div_numbers:
+        available_ops.append("division")
+    if not available_ops:
+        return []
+
     while len(exercises) < num_exercises and len(seen) < num_exercises * 20:
-        if random.choice(["multiplication", "division"]) == "multiplication":
-            n1 = random.choice(user_numbers)
+        operation = random.choice(available_ops)
+        if operation == "multiplication":
+            n1 = random.choice(mult_numbers)
             n2 = random.randint(1, 10)
             answer = n1 * n2
             expr = f"{n1} x {n2}"
         else:
-            n2 = random.choice(user_numbers)
+            n2 = random.choice(div_numbers)
             n1 = random.randint(1, n2 * 10)
             while n1 % n2 != 0:
                 n1 = random.randint(1, n2 * 10)
@@ -297,7 +306,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         f"{tafel_word} van {numbers_str}!", fontname=font_br, fontsize=TITLE_FONTSIZE, color=(0, 0, 0))
 
     base_y = grid_y + 14 + (TITLE_FONTSIZE + 4) * 2
-    for i, line in enumerate(["", "Los alle sommen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
+    for i, line in enumerate(["", "Los alle oefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
         page.insert_text((instr_x, base_y + i * LINE_H), line, fontname=font_r, fontsize=INSTR_FONTSIZE, color=(0, 0, 0))
 
     # ── Oefeningen in 2 kolommen ──────────────────────────────────────────────
@@ -374,7 +383,7 @@ def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_color
             image_source = image_path
 
         matrix, cluster_colors = process_image(image_source)
-        exercises     = generate_math_exercises(user_numbers, num_clusters=len(cluster_colors), num_exercises=num_exercises)
+        exercises     = generate_math_exercises(user_numbers["mult"], user_numbers["div"], num_clusters=len(cluster_colors), num_exercises=num_exercises)
         answer_matrix = populate_matrix(matrix, exercises, num_clusters=len(cluster_colors))
 
         if show_answers:
@@ -405,12 +414,22 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("### 📚 Stap 1 — Welke tafels wil je oefenen?")
-selected = st.multiselect(
-    "Kies één of meerdere tafels (1–10):",
-    options=list(range(1, 11)),
-    default=[2, 5],
-    format_func=lambda x: f"Tafel van {x}",
-)
+col1, col2 = st.columns(2)
+with col1:
+    mult_selected = st.multiselect(
+        "✖️ Maaltafels:",
+        options=list(range(1, 11)),
+        default=[2, 5],
+        format_func=lambda x: f"Tafel van {x}",
+    )
+with col2:
+    div_selected = st.multiselect(
+        "➗ Deeltafels:",
+        options=list(range(1, 11)),
+        default=[2, 5],
+        format_func=lambda x: f"Tafel van {x}",
+    )
+selected = {"mult": mult_selected, "div": div_selected}
 
 st.markdown("### 🖼️ Stap 2 — Kies een afbeelding")
 img_mode = st.radio("", ["Willekeurig", "Specifiek nummer", "Eigen afbeelding uploaden"], horizontal=True)
@@ -439,8 +458,8 @@ num_exercises = st.slider("Aantal oefeningen per pagina:", min_value=10, max_val
 st.markdown("---")
 
 if st.button("✏️ Genereer Rekentekening!"):
-    if not selected:
-        st.error("Kies minstens één tafel!")
+    if not selected["mult"] and not selected["div"]:
+        st.error("Kies minstens één maaltafel of deeltafel!")
     else:
         with st.spinner("Bezig met genereren..."):
             if img_mode == "Eigen afbeelding uploaden" and uploaded_image is None:
@@ -448,7 +467,8 @@ if st.button("✏️ Genereer Rekentekening!"):
                 st.stop()
             pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors, uploaded_image=uploaded_image, show_answers=show_answers, num_exercises=num_exercises)
 
-        tafel_str = ", ".join(str(n) for n in selected)
+        all_selected = sorted(set(selected["mult"] + selected["div"]))
+        tafel_str = ", ".join(str(n) for n in all_selected)
         st.success(f"✅ {num_pages} pagina('s) klaar voor de tafels van {tafel_str}!")
         st.download_button(
             label="⬇️ Download Rekentekening.pdf",
