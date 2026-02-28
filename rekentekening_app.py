@@ -308,7 +308,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         f"{tafel_word} van {numbers_str}!", fontname=font_br, fontsize=TITLE_FONTSIZE, color=(0, 0, 0))
 
     base_y = grid_y + 14 + (TITLE_FONTSIZE + 4) * 2
-    for i, line in enumerate(["", "Los alle oefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
+    for i, line in enumerate(["", "Los alle sommen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
         page.insert_text((instr_x, base_y + i * LINE_H), line, fontname=font_r, fontsize=INSTR_FONTSIZE, color=(0, 0, 0))
 
     # ── Oefeningen in 2 kolommen ──────────────────────────────────────────────
@@ -440,6 +440,11 @@ uploaded_image = None
 
 if img_mode == "Specifiek nummer":
     img_choice = st.slider("Afbeeldingsnummer:", min_value=1, max_value=MAX_IMAGE_NUMBER, value=1)
+    preview_path = os.path.join(IMAGES_DIR, f"{img_choice}.png")
+    if os.path.exists(preview_path):
+        st.image(preview_path, caption=f"Afbeelding {img_choice}", width=250)
+    else:
+        st.warning(f"Afbeelding {img_choice} niet gevonden.")
 elif img_mode == "Eigen afbeelding uploaden":
     uploaded_file = st.file_uploader("Upload een afbeelding (PNG of JPG):", type=["png", "jpg", "jpeg"])
     if uploaded_file is not None:
