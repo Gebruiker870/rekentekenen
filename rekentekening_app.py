@@ -297,7 +297,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         f"{tafel_word} van {numbers_str}!", fontname=font_br, fontsize=TITLE_FONTSIZE, color=(0, 0, 0))
 
     base_y = grid_y + 14 + (TITLE_FONTSIZE + 4) * 2
-    for i, line in enumerate(["", "Los alle rekenoefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
+    for i, line in enumerate(["", "Los alle sommen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
         page.insert_text((instr_x, base_y + i * LINE_H), line, fontname=font_r, fontsize=INSTR_FONTSIZE, color=(0, 0, 0))
 
     # ── Oefeningen in 2 kolommen ──────────────────────────────────────────────
@@ -330,9 +330,9 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         page.insert_text((ex_x, ex_y + 16), label, fontname=font_r, fontsize=EX_FONTSIZE, color=(0, 0, 0))
         label_w = fitz.get_text_length(label, fontname=MEASURE_FONT, fontsize=EX_FONTSIZE)
         if show_answers:
-            # Schrijf het antwoord na het = teken
+            # Schrijf het antwoord in het zwart na het = teken
             ans_str = str(answer)
-            page.insert_text((ex_x + label_w + 4, ex_y + 16), ans_str, fontname=font_br, fontsize=EX_FONTSIZE, color=(cr, cg, cb))
+            page.insert_text((ex_x + label_w + 4, ex_y + 16), ans_str, fontname=font_br, fontsize=EX_FONTSIZE, color=(0, 0, 0))
         else:
             # Stippellijn als invulruimte
             line_x0 = ex_x + label_w + 4
@@ -348,13 +348,13 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
 # ── PDF GENEREREN ─────────────────────────────────────────────────────────────
 
 def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_colors: bool,
-                 uploaded_image=None, show_answers: bool = False) -> bytes:
+                 uploaded_image=None, show_answers: bool = False, num_exercises: int = NUM_EXERCISES) -> bytes:
     """Genereer het volledige PDF-document en geef het terug als bytes."""
     doc = fitz.open()
     used_images = []
 
     for page_num in range(num_pages):
-        # Gebruik geüploade afbeelding voor de eerste pagina (en enige pagina als num_pages == 1)
+        # Gebruik geüploade afbeelding voor de eerste pagina
         if uploaded_image is not None and page_num == 0:
             image_source = uploaded_image
         else:
@@ -374,7 +374,7 @@ def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_color
             image_source = image_path
 
         matrix, cluster_colors = process_image(image_source)
-        exercises     = generate_math_exercises(user_numbers, num_clusters=len(cluster_colors))
+        exercises     = generate_math_exercises(user_numbers, num_clusters=len(cluster_colors), num_exercises=num_exercises)
         answer_matrix = populate_matrix(matrix, exercises, num_clusters=len(cluster_colors))
 
         if show_answers:
@@ -413,7 +413,7 @@ selected = st.multiselect(
 )
 
 st.markdown("### 🖼️ Stap 2 — Kies een afbeelding")
-img_mode = st.radio("", ["Willekeurig", "Specifiek nummer", "Eigen afbeelding uploaden"], horizontal=False)
+img_mode = st.radio("", ["Willekeurig", "Specifiek nummer", "Eigen afbeelding uploaden"], horizontal=True)
 img_choice = 0
 uploaded_image = None
 
@@ -431,11 +431,10 @@ num_pages = st.slider("Aantal pagina's:", min_value=1, max_value=20, value=1)
 
 st.markdown("### ⚙️ Opties")
 show_answers = st.toggle("Genereer ook een antwoordblad (2 pagina's per afbeelding)", value=False)
-if not show_answers:
-    show_colors = st.toggle("Toon kleuren in de matrix", value=False)
-else:
-    show_colors = False
+if show_answers:
     st.info("📄 Per afbeelding worden 2 pagina's gegenereerd: een werkblad (zonder kleur) en een antwoordblad (met kleur en oplossingen).")
+show_colors = False
+num_exercises = st.slider("Aantal oefeningen per pagina:", min_value=10, max_value=40, value=40, step=5)
 
 st.markdown("---")
 
@@ -447,7 +446,7 @@ if st.button("✏️ Genereer Rekentekening!"):
             if img_mode == "Eigen afbeelding uploaden" and uploaded_image is None:
                 st.error("Upload eerst een afbeelding!")
                 st.stop()
-            pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors, uploaded_image=uploaded_image, show_answers=show_answers)
+            pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors, uploaded_image=uploaded_image, show_answers=show_answers, num_exercises=num_exercises)
 
         tafel_str = ", ".join(str(n) for n in selected)
         st.success(f"✅ {num_pages} pagina('s) klaar voor de tafels van {tafel_str}!")
