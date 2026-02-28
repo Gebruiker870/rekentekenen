@@ -413,7 +413,7 @@ st.markdown("### 📄 Stap 3 — Hoeveel pagina's?")
 num_pages = st.slider("Aantal pagina's:", min_value=1, max_value=20, value=1)
 
 st.markdown("### ⚙️ Opties")
-show_colors = st.toggle("Toon kleuren in de matrix", value=True)
+show_colors = st.toggle("Toon kleuren in de matrix", value=False)
 
 st.markdown("---")
 
