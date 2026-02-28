@@ -1,6 +1,6 @@
 """
 Rekentekening — Streamlit app
-Genereert een PDF met rekensommen gekoppeld aan een kleurplaat.
+Genereert een PDF met rekenoefeningen gekoppeld aan een kleurplaat.
 
 Benodigde mapstructuur:
     rekentekening_app.py
@@ -120,7 +120,7 @@ def process_image(image_source, max_size: int = MAX_IMAGE_SIZE):
 # ── OEFENINGEN GENEREREN ──────────────────────────────────────────────────────
 
 def generate_math_exercises(mult_numbers: list, div_numbers: list, num_clusters: int = 8, num_exercises: int = NUM_EXERCISES):
-    """Genereer unieke vermenigvuldigings- en deelsommen voor de opgegeven tafels."""
+    """Genereer unieke vermenigvuldigings- en deeloefeningen voor de opgegeven tafels."""
     seen = set()
     exercises = []
     answer_to_group = {}
@@ -415,7 +415,7 @@ def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_color
 st.markdown("""
 <div class="title-block">
     <h1>🎨 Rekentekening</h1>
-    <p class="subtitle">Maak een kleurplaat met rekensommen!</p>
+    <p class="subtitle">Maak een kleurplaat met rekenoefeningen!</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -457,7 +457,7 @@ elif img_mode == "Eigen afbeelding uploaden":
         st.info("De geüploade afbeelding wordt gebruikt voor de eerste pagina. Extra pagina's gebruiken willekeurige afbeeldingen.")
 
 st.markdown("### 📄 Stap 3 — Hoeveel pagina's?")
-num_pages = st.slider("Aantal pagina's:", min_value=1, max_value=20, value=1)
+num_pages = st.slider("Aantal pagina's:", min_value=1, max_value=40, value=1)
 
 st.markdown("### ⚙️ Opties")
 show_answers = st.toggle("Genereer ook een antwoordblad (2 pagina's per afbeelding)", value=False)
