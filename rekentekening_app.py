@@ -291,14 +291,16 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
     # ── Instructietekst ───────────────────────────────────────────────────────
     instr_x = grid_x + cols * cell_size + 20
 
-    if len(user_numbers) == 1:
-        numbers_str = str(user_numbers[0])
-    elif len(user_numbers) == 2:
-        numbers_str = f"{user_numbers[0]} en {user_numbers[1]}"
+    # user_numbers is een dict {"mult": [...], "div": [...]}
+    all_numbers = sorted(set(user_numbers.get("mult", []) + user_numbers.get("div", [])))
+    if len(all_numbers) == 1:
+        numbers_str = str(all_numbers[0])
+    elif len(all_numbers) == 2:
+        numbers_str = f"{all_numbers[0]} en {all_numbers[1]}"
     else:
-        numbers_str = ", ".join(str(n) for n in user_numbers[:-1]) + f" en {user_numbers[-1]}"
+        numbers_str = ", ".join(str(n) for n in all_numbers[:-1]) + f" en {all_numbers[-1]}"
 
-    tafel_word = "tafel" if len(user_numbers) == 1 else "tafels"
+    tafel_word = "tafel" if len(all_numbers) == 1 else "tafels"
 
     page.insert_text((instr_x, grid_y + 14),
         "Rekentekenen met de", fontname=font_br, fontsize=TITLE_FONTSIZE, color=(0, 0, 0))
@@ -306,7 +308,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         f"{tafel_word} van {numbers_str}!", fontname=font_br, fontsize=TITLE_FONTSIZE, color=(0, 0, 0))
 
     base_y = grid_y + 14 + (TITLE_FONTSIZE + 4) * 2
-    for i, line in enumerate(["", "Los alle oefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
+    for i, line in enumerate(["", "Los alle sommen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
         page.insert_text((instr_x, base_y + i * LINE_H), line, fontname=font_r, fontsize=INSTR_FONTSIZE, color=(0, 0, 0))
 
     # ── Oefeningen in 2 kolommen ──────────────────────────────────────────────
