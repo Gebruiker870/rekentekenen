@@ -235,7 +235,7 @@ def _load_playful_font(page) -> tuple:
     return "helv", "hebo"
 
 
-def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors, show_colors=True):
+def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors, show_colors=True, show_answers=False):
     """Voeg één pagina toe aan het PDF-document."""
     PAGE_W, PAGE_H   = 595, 842
     MARGIN           = 50
@@ -297,7 +297,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         f"{tafel_word} van {numbers_str}!", fontname=font_br, fontsize=TITLE_FONTSIZE, color=(0, 0, 0))
 
     base_y = grid_y + 14 + (TITLE_FONTSIZE + 4) * 2
-    for i, line in enumerate(["", "Los alle oefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
+    for i, line in enumerate(["", "Los alle rekenoefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
         page.insert_text((instr_x, base_y + i * LINE_H), line, fontname=font_r, fontsize=INSTR_FONTSIZE, color=(0, 0, 0))
 
     # ── Oefeningen in 2 kolommen ──────────────────────────────────────────────
@@ -309,7 +309,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
     color_col_w = max(fitz.get_text_length(n, fontname=MEASURE_FONT_B, fontsize=EX_FONTSIZE) for n in all_names) + 8
 
     def draw_exercise(ex, x_start, ex_y, col_w):
-        cluster, _, text = ex
+        cluster, answer, text = ex
         cr, cg, cb = cluster_colors.get(cluster, (0, 0, 0))
         color_name = get_color_name(cr, cg, cb)
         name_w = fitz.get_text_length(color_name, fontname=MEASURE_FONT_B, fontsize=EX_FONTSIZE)
@@ -328,9 +328,16 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         ex_x = x_start + color_col_w + 6
         label = text.replace("= ?", "=")
         page.insert_text((ex_x, ex_y + 16), label, fontname=font_r, fontsize=EX_FONTSIZE, color=(0, 0, 0))
-        line_x0 = ex_x + fitz.get_text_length(label, fontname=MEASURE_FONT, fontsize=EX_FONTSIZE) + 4
-        page.draw_line((line_x0, ex_y + 15), (x_start + col_w - 8, ex_y + 15),
-                       color=(0, 0, 0), width=0.5, dashes="[2 3]")
+        label_w = fitz.get_text_length(label, fontname=MEASURE_FONT, fontsize=EX_FONTSIZE)
+        if show_answers:
+            # Schrijf het antwoord na het = teken
+            ans_str = str(answer)
+            page.insert_text((ex_x + label_w + 4, ex_y + 16), ans_str, fontname=font_br, fontsize=EX_FONTSIZE, color=(cr, cg, cb))
+        else:
+            # Stippellijn als invulruimte
+            line_x0 = ex_x + label_w + 4
+            page.draw_line((line_x0, ex_y + 15), (x_start + col_w - 8, ex_y + 15),
+                           color=(0, 0, 0), width=0.5, dashes="[2 3]")
 
     for i, ex in enumerate(left_col):
         draw_exercise(ex, MARGIN, y + i * ROW_HEIGHT, col_width)
@@ -341,7 +348,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
 # ── PDF GENEREREN ─────────────────────────────────────────────────────────────
 
 def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_colors: bool,
-                 uploaded_image=None) -> bytes:
+                 uploaded_image=None, show_answers: bool = False) -> bytes:
     """Genereer het volledige PDF-document en geef het terug als bytes."""
     doc = fitz.open()
     used_images = []
@@ -369,7 +376,17 @@ def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_color
         matrix, cluster_colors = process_image(image_source)
         exercises     = generate_math_exercises(user_numbers, num_clusters=len(cluster_colors))
         answer_matrix = populate_matrix(matrix, exercises, num_clusters=len(cluster_colors))
-        draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors, show_colors=show_colors)
+
+        if show_answers:
+            # Pagina 1: zonder kleur en zonder oplossingen (voor de leerling)
+            draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors,
+                      show_colors=False, show_answers=False)
+            # Pagina 2: met kleur en met oplossingen (antwoordblad)
+            draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors,
+                      show_colors=True, show_answers=True)
+        else:
+            draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors,
+                      show_colors=show_colors, show_answers=False)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -396,7 +413,7 @@ selected = st.multiselect(
 )
 
 st.markdown("### 🖼️ Stap 2 — Kies een afbeelding")
-img_mode = st.radio("", ["Willekeurig", "Specifiek nummer", "Eigen afbeelding uploaden"], horizontal=True)
+img_mode = st.radio("", ["Willekeurig", "Specifiek nummer", "Eigen afbeelding uploaden"], horizontal=false)
 img_choice = 0
 uploaded_image = None
 
@@ -413,7 +430,7 @@ st.markdown("### 📄 Stap 3 — Hoeveel pagina's?")
 num_pages = st.slider("Aantal pagina's:", min_value=1, max_value=20, value=1)
 
 st.markdown("### ⚙️ Opties")
-show_colors = st.toggle("Toon kleuren in de matrix", value=False)
+show_colors = st.toggle("Toon kleuren in de matrix", value=True)
 
 st.markdown("---")
 
@@ -425,7 +442,7 @@ if st.button("✏️ Genereer Rekentekening!"):
             if img_mode == "Eigen afbeelding uploaden" and uploaded_image is None:
                 st.error("Upload eerst een afbeelding!")
                 st.stop()
-            pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors, uploaded_image=uploaded_image)
+            pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors, uploaded_image=uploaded_image, show_answers=show_answers)
 
         tafel_str = ", ".join(str(n) for n in selected)
         st.success(f"✅ {num_pages} pagina('s) klaar voor de tafels van {tafel_str}!")
