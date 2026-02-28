@@ -413,7 +413,7 @@ selected = st.multiselect(
 )
 
 st.markdown("### 🖼️ Stap 2 — Kies een afbeelding")
-img_mode = st.radio("", ["Willekeurig", "Specifiek nummer", "Eigen afbeelding uploaden"], horizontal=false)
+img_mode = st.radio("", ["Willekeurig", "Specifiek nummer", "Eigen afbeelding uploaden"], horizontal=False)
 img_choice = 0
 uploaded_image = None
 
