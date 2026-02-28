@@ -83,9 +83,9 @@ st.markdown("""
 
 # ── AFBEELDING VERWERKEN ──────────────────────────────────────────────────────
 
-def process_image(image_path: str, max_size: int = MAX_IMAGE_SIZE):
-    """Laad een afbeelding, reduceer naar max_size en extraheer kleurclusters."""
-    image = Image.open(image_path)
+def process_image(image_source, max_size: int = MAX_IMAGE_SIZE):
+    """Laad een afbeelding (pad of bestand), reduceer naar max_size en extraheer kleurclusters."""
+    image = Image.open(image_source)
     image = image.resize((min(image.width, max_size), min(image.height, max_size)))
 
     # Transparantie vervangen door witte achtergrond
@@ -340,28 +340,34 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
 
 # ── PDF GENEREREN ─────────────────────────────────────────────────────────────
 
-def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_colors: bool) -> bytes:
+def generate_pdf(user_numbers: list, img_choice: int, num_pages: int, show_colors: bool,
+                 uploaded_image=None) -> bytes:
     """Genereer het volledige PDF-document en geef het terug als bytes."""
     doc = fitz.open()
     used_images = []
 
-    for _ in range(num_pages):
-        if img_choice == 0 or num_pages > 1:
-            available = [i for i in range(1, MAX_IMAGE_NUMBER + 1) if i not in used_images]
-            if not available:
-                used_images.clear()
-                available = list(range(1, MAX_IMAGE_NUMBER + 1))
-            img_num = random.choice(available)
-            used_images.append(img_num)
+    for page_num in range(num_pages):
+        # Gebruik geüploade afbeelding voor de eerste pagina (en enige pagina als num_pages == 1)
+        if uploaded_image is not None and page_num == 0:
+            image_source = uploaded_image
         else:
-            img_num = img_choice
+            if img_choice == 0 or num_pages > 1:
+                available = [i for i in range(1, MAX_IMAGE_NUMBER + 1) if i not in used_images]
+                if not available:
+                    used_images.clear()
+                    available = list(range(1, MAX_IMAGE_NUMBER + 1))
+                img_num = random.choice(available)
+                used_images.append(img_num)
+            else:
+                img_num = img_choice
 
-        image_path = os.path.join(IMAGES_DIR, f"{img_num}.png")
-        if not os.path.exists(image_path):
-            continue
+            image_path = os.path.join(IMAGES_DIR, f"{img_num}.png")
+            if not os.path.exists(image_path):
+                continue
+            image_source = image_path
 
-        matrix, cluster_colors = process_image(image_path)
-        exercises    = generate_math_exercises(user_numbers, num_clusters=len(cluster_colors))
+        matrix, cluster_colors = process_image(image_source)
+        exercises     = generate_math_exercises(user_numbers, num_clusters=len(cluster_colors))
         answer_matrix = populate_matrix(matrix, exercises, num_clusters=len(cluster_colors))
         draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors, show_colors=show_colors)
 
@@ -390,10 +396,18 @@ selected = st.multiselect(
 )
 
 st.markdown("### 🖼️ Stap 2 — Kies een afbeelding")
-img_mode = st.radio("", ["Willekeurig", "Specifiek nummer"], horizontal=True)
+img_mode = st.radio("", ["Willekeurig", "Specifiek nummer", "Eigen afbeelding uploaden"], horizontal=True)
 img_choice = 0
+uploaded_image = None
+
 if img_mode == "Specifiek nummer":
     img_choice = st.slider("Afbeeldingsnummer:", min_value=1, max_value=MAX_IMAGE_NUMBER, value=1)
+elif img_mode == "Eigen afbeelding uploaden":
+    uploaded_file = st.file_uploader("Upload een afbeelding (PNG of JPG):", type=["png", "jpg", "jpeg"])
+    if uploaded_file is not None:
+        uploaded_image = io.BytesIO(uploaded_file.read())
+        st.image(uploaded_file, caption="Geüploade afbeelding", width=200)
+        st.info("De geüploade afbeelding wordt gebruikt voor de eerste pagina. Extra pagina's gebruiken willekeurige afbeeldingen.")
 
 st.markdown("### 📄 Stap 3 — Hoeveel pagina's?")
 num_pages = st.slider("Aantal pagina's:", min_value=1, max_value=20, value=1)
@@ -408,7 +422,10 @@ if st.button("✏️ Genereer Rekentekening!"):
         st.error("Kies minstens één tafel!")
     else:
         with st.spinner("Bezig met genereren..."):
-            pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors)
+            if img_mode == "Eigen afbeelding uploaden" and uploaded_image is None:
+                st.error("Upload eerst een afbeelding!")
+                st.stop()
+            pdf_bytes = generate_pdf(selected, img_choice, num_pages, show_colors, uploaded_image=uploaded_image)
 
         tafel_str = ", ".join(str(n) for n in selected)
         st.success(f"✅ {num_pages} pagina('s) klaar voor de tafels van {tafel_str}!")
