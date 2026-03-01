@@ -210,9 +210,14 @@ def generate_math_exercises(
         if len(exercises) < num_exercises else None
     )
 
-    unique_groups = sorted(set(g for g, _, _ in exercises))
-    cluster_map = {g: (i % num_clusters) + 1 for i, g in enumerate(unique_groups)}
-    exercises = [(cluster_map[g], ans, ex) for g, ans, ex in exercises]
+    # Wijs clusters toe op basis van antwoordfrequentie (round-robin gesorteerd op frequentie)
+    # zodat veel-voorkomende antwoorden verspreid raken over verschillende clusters
+    answer_counts: dict[int, int] = {}
+    for _, ans, _ in exercises:
+        answer_counts[ans] = answer_counts.get(ans, 0) + 1
+    sorted_answers = sorted(answer_counts, key=lambda a: -answer_counts[a])
+    answer_to_cluster = {ans: (i % num_clusters) + 1 for i, ans in enumerate(sorted_answers)}
+    exercises = [(answer_to_cluster[ans], ans, ex) for _, ans, ex in exercises]
     random.shuffle(exercises)
     return exercises, warning
 
@@ -383,20 +388,31 @@ def draw_page(
     # Bij veel tafels: gebruik "1 t/m 10" als aaneengesloten, anders splits over twee regels
     tafel_word = "tafel" if len(all_nums) == 1 else "tafels"
     num_lines  = _nums_lines(all_nums)
-    title_lines = [
-        (cfg.title_fontsize, font_br, "Rekentekenen met de"),
-        *[(cfg.title_fontsize, font_br,
-           f"{tafel_word if i == 0 else '      '} van {ln}{'!' if i == len(num_lines) - 1 else ''}")
+
+    # Schaal de titelfontgrootte zodat de langste titelregel altijd past
+    title_candidates = [
+        "Rekentekenen met de",
+        *[f"{tafel_word if i == 0 else '      '} van {ln}{'!' if i == len(num_lines) - 1 else ''}"
           for i, ln in enumerate(num_lines)],
-        (cfg.instr_fontsize, font_r,  ""),
-        (cfg.instr_fontsize, font_r,  "Los alle oefeningen op en kleur"),
-        (cfg.instr_fontsize, font_r,  "daarna de getallen hiernaast"),
-        (cfg.instr_fontsize, font_r,  "in de juiste kleur!"),
+    ]
+    title_fs = cfg.title_fontsize
+    while title_fs > 8:
+        if all(_text_len(t, fontname=cfg.measure_font_b, fontsize=title_fs) <= instr_width
+               for t in title_candidates):
+            break
+        title_fs -= 1
+    instr_fs = min(cfg.instr_fontsize, title_fs)
+
+    title_lines = [(title_fs, font_br, t) for t in title_candidates] + [
+        (instr_fs, font_r, ""),
+        (instr_fs, font_r, "Los alle oefeningen op en kleur"),
+        (instr_fs, font_r, "daarna de getallen hiernaast"),
+        (instr_fs, font_r, "in de juiste kleur!"),
     ]
     y_cursor = grid_y + 14
     for fs_line, fn, txt in title_lines:
         page.insert_text((instr_x, y_cursor), txt, fontname=fn, fontsize=fs_line, color=(0, 0, 0))
-        y_cursor += fs_line + 4 if fn == font_br else cfg.line_h
+        y_cursor += fs_line + 4 if fn == font_br else instr_fs + 6
 
     # ── QR Code ───────────────────────────────────────────────────────────────
     qr_y = y_cursor + 6
