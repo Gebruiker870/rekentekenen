@@ -370,18 +370,25 @@ def draw_page(
     instr_width = cfg.page_w - cfg.margin - instr_x
     all_nums   = sorted(set(user_numbers.get("mult", []) + user_numbers.get("div", [])))
 
-    # numbers_str in één regel met join
-    numbers_str = (
-        str(all_nums[0]) if len(all_nums) == 1
-        else " en ".join(str(n) for n in all_nums) if len(all_nums) == 2
-        else ", ".join(str(n) for n in all_nums[:-1]) + f" en {all_nums[-1]}"
-    )
+
+    # Bij veel tafels: gebruik "1 t/m 10" als aaneengesloten, anders splits over twee regels
     tafel_word = "tafel" if len(all_nums) == 1 else "tafels"
 
-    # Titel + instructieregels als één lijst
+    def _nums_lines(nums: list) -> list[str]:
+        if len(nums) == 1:  return [str(nums[0])]
+        if len(nums) == 2:  return [f"{nums[0]} en {nums[1]}"]
+        if nums == list(range(nums[0], nums[-1] + 1)):  return [f"{nums[0]} t/m {nums[-1]}"]
+        if len(nums) <= 4:  return [", ".join(str(n) for n in nums[:-1]) + f" en {nums[-1]}"]
+        mid = len(nums) // 2  # te lang: splits in twee regels
+        return [", ".join(str(n) for n in nums[:mid]) + ",",
+                ", ".join(str(n) for n in nums[mid:-1]) + f" en {nums[-1]}"]
+
+    num_lines = _nums_lines(all_nums)
     title_lines = [
         (cfg.title_fontsize, font_br, "Rekentekenen met de"),
-        (cfg.title_fontsize, font_br, f"{tafel_word} van {numbers_str}!"),
+        *[(cfg.title_fontsize, font_br,
+           f"{tafel_word if i == 0 else '      '} van {ln}{'!' if i == len(num_lines) - 1 else ''}")
+          for i, ln in enumerate(num_lines)],
         (cfg.instr_fontsize, font_r,  ""),
         (cfg.instr_fontsize, font_r,  "Los alle oefeningen op en kleur"),
         (cfg.instr_fontsize, font_r,  "daarna de getallen hiernaast"),
@@ -515,7 +522,7 @@ st.markdown("### ⚙️ Opties")
 show_answers = st.toggle("Genereer ook een antwoordblad (2 pagina's per afbeelding)", value=False)
 if show_answers:
     st.info("📄 Per afbeelding worden 2 pagina's gegenereerd: een werkblad (zonder kleur) en een antwoordblad (met kleur en oplossingen).")
-show_colors   = st.toggle("Toon kleuren op werkblad", value=False)
+show_colors   = False
 num_exercises = st.slider("Aantal oefeningen per pagina:", min_value=10, max_value=40, value=40, step=5)
 
 st.markdown("---")
