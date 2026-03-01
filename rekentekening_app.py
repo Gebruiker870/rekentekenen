@@ -507,7 +507,10 @@ uploaded_bytes: bytes | None = None
 if img_mode == "Specifiek nummer":
     img_choice   = st.slider("Afbeeldingsnummer:", min_value=1, max_value=MAX_IMAGE_NUMBER, value=1)
     preview_path = os.path.join(IMAGES_DIR, f"{img_choice}.png")
-    st.image(preview_path) if os.path.exists(preview_path) else st.warning(f"Afbeelding {img_choice} niet gevonden.")
+    if os.path.exists(preview_path):
+        st.image(preview_path)
+    else:
+        st.warning(f"Afbeelding {img_choice} niet gevonden.")
 elif img_mode == "Eigen afbeelding uploaden":
     uploaded_file = st.file_uploader("Upload een afbeelding (PNG of JPG):", type=["png", "jpg", "jpeg"])
     if uploaded_file is not None:
