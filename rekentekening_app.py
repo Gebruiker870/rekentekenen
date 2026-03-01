@@ -15,6 +15,7 @@ import random
 
 import fitz  # PyMuPDF
 import numpy as np
+import qrcode
 import streamlit as st
 from PIL import Image
 
@@ -24,6 +25,7 @@ IMAGES_DIR       = os.path.join(os.path.dirname(os.path.abspath(__file__)), "afb
 MAX_IMAGE_SIZE   = 15
 NUM_EXERCISES    = 40
 MAX_IMAGE_NUMBER = 117
+QR_URL           = "https://rekentekenen.streamlit.app/"
 
 FONT_CANDIDATES = [
     "/Library/Fonts/Comic Sans MS.ttf",
@@ -233,6 +235,26 @@ def get_color_name(r: float, g: float, b: float) -> str:
     return "Blauw"
 
 
+# ── QR CODE GENEREREN ─────────────────────────────────────────────────────────
+
+@st.cache_data
+def generate_qr_png(url: str, size: int = 80) -> bytes:
+    """Genereer een QR code als PNG bytes voor de gegeven URL."""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=4,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    img = img.resize((size, size), Image.NEAREST)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 # ── PDF PAGINA TEKENEN ────────────────────────────────────────────────────────
 
 # Cache voor fitz.get_text_length (wordt honderden keren aangeroepen per pagina)
@@ -275,6 +297,7 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
     LINE_H           = 19
     MEASURE_FONT     = "helv"   # fitz.get_text_length vereist ingebouwde fonts
     MEASURE_FONT_B   = "hebo"
+    QR_SIZE          = 70       # pixels / punten in de PDF
 
     page = doc.new_page(width=PAGE_W, height=PAGE_H)
     font_r, font_br = _load_playful_font(page)
@@ -333,8 +356,22 @@ def draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_color
         f"{tafel_word} van {numbers_str}!", fontname=font_br, fontsize=TITLE_FONTSIZE, color=(0, 0, 0))
 
     base_y = grid_y + 14 + (TITLE_FONTSIZE + 4) * 2
-    for i, line in enumerate(["", "Los alle oefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]):
+    instr_lines = ["", "Los alle oefeningen op en kleur", "daarna de getallen hiernaast", "in de juiste kleur!"]
+    for i, line in enumerate(instr_lines):
         page.insert_text((instr_x, base_y + i * LINE_H), line, fontname=font_r, fontsize=INSTR_FONTSIZE, color=(0, 0, 0))
+
+    # ── QR Code ───────────────────────────────────────────────────────────────
+    qr_y = base_y + len(instr_lines) * LINE_H + 10
+    qr_png = generate_qr_png(QR_URL, size=QR_SIZE)
+    page.insert_image(
+        fitz.Rect(instr_x, qr_y, instr_x + QR_SIZE, qr_y + QR_SIZE),
+        stream=qr_png,
+    )
+    url_fontsize = 7
+    page.insert_text(
+        (instr_x, qr_y + QR_SIZE + 8),
+        QR_URL, fontname=font_r, fontsize=url_fontsize, color=(0.4, 0.4, 0.4)
+    )
 
     # ── Oefeningen in 2 kolommen ──────────────────────────────────────────────
     y = grid_y + rows * cell_size + GAP
