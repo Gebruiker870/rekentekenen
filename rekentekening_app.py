@@ -11,7 +11,7 @@ import os
 import random
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Iterator
+
 
 import fitz  # PyMuPDF
 import numpy as np
@@ -146,14 +146,17 @@ def build_image_queue(num_pages: int, img_choice: int) -> tuple[list[int], list[
 
     return queue[:num_pages], warnings
 
-# ── CYCLING GENERATOR ─────────────────────────────────────────────────────────
+# ── TAFELS OMSCHRIJVEN ───────────────────────────────────────────────────────
 
-def _cycling(answers: list) -> Iterator:
-    """Herhaalt de lijst in willekeurige volgorde, telkens opnieuw geschud."""
-    while True:
-        shuffled = answers[:]
-        random.shuffle(shuffled)
-        yield from shuffled
+def _nums_lines(nums: list[int]) -> list[str]:
+    """Zet een lijst tafelnummers om naar één of twee leesbare regelstukken voor de PDF-titel."""
+    if len(nums) == 1:  return [str(nums[0])]
+    if len(nums) == 2:  return [f"{nums[0]} en {nums[1]}"]
+    if nums == list(range(nums[0], nums[-1] + 1)):  return [f"{nums[0]} t/m {nums[-1]}"]
+    if len(nums) <= 4:  return [", ".join(str(n) for n in nums[:-1]) + f" en {nums[-1]}"]
+    mid = len(nums) // 2
+    return [", ".join(str(n) for n in nums[:mid]) + ",",
+            ", ".join(str(n) for n in nums[mid:-1]) + f" en {nums[-1]}"]
 
 # ── OEFENINGEN GENEREREN ──────────────────────────────────────────────────────
 
@@ -221,13 +224,20 @@ def populate_matrix(matrix: np.ndarray, exercises: list[tuple], num_clusters: in
     for cluster, answer, _ in exercises:
         if answer not in cluster_answers[cluster]:
             cluster_answers[cluster].append(answer)
-    cycles = {c: _cycling(ans) for c, ans in cluster_answers.items() if ans}
+
     result = np.full(matrix.shape, "?", dtype=object)
-    for row in range(matrix.shape[0]):
-        for col in range(matrix.shape[1]):
-            cluster = int(matrix[row][col])
-            if cluster in cycles:
-                result[row][col] = next(cycles[cluster])
+    for c, answers in cluster_answers.items():
+        if not answers:
+            continue
+        mask = (matrix == c)           # boolean masker voor dit cluster
+        n    = int(mask.sum())         # aantal cellen in dit cluster
+        if n == 0:
+            continue
+        # Vul n cellen in één keer: herhaal de antwoordenlijst zo vaak als nodig
+        reps   = -(-n // len(answers)) # ceil division
+        pool   = (answers * reps)[:n]
+        random.shuffle(pool)
+        result[mask] = pool            # vectoriseerde toewijzing
     return result
 
 # ── KLEURNAAM BEPALEN ─────────────────────────────────────────────────────────
@@ -370,20 +380,9 @@ def draw_page(
     instr_width = cfg.page_w - cfg.margin - instr_x
     all_nums   = sorted(set(user_numbers.get("mult", []) + user_numbers.get("div", [])))
 
-
     # Bij veel tafels: gebruik "1 t/m 10" als aaneengesloten, anders splits over twee regels
     tafel_word = "tafel" if len(all_nums) == 1 else "tafels"
-
-    def _nums_lines(nums: list) -> list[str]:
-        if len(nums) == 1:  return [str(nums[0])]
-        if len(nums) == 2:  return [f"{nums[0]} en {nums[1]}"]
-        if nums == list(range(nums[0], nums[-1] + 1)):  return [f"{nums[0]} t/m {nums[-1]}"]
-        if len(nums) <= 4:  return [", ".join(str(n) for n in nums[:-1]) + f" en {nums[-1]}"]
-        mid = len(nums) // 2  # te lang: splits in twee regels
-        return [", ".join(str(n) for n in nums[:mid]) + ",",
-                ", ".join(str(n) for n in nums[mid:-1]) + f" en {nums[-1]}"]
-
-    num_lines = _nums_lines(all_nums)
+    num_lines  = _nums_lines(all_nums)
     title_lines = [
         (cfg.title_fontsize, font_br, "Rekentekenen met de"),
         *[(cfg.title_fontsize, font_br,
