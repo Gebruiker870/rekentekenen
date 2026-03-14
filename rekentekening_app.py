@@ -264,7 +264,7 @@ def _color_rules(r: float, g: float, b: float, max_c: float, min_c: float, sat: 
     if max_c == g:
         if r > 150:              return "Geel"
         if b > g * 0.85:         return "Lichtblauw"
-        if r > g * 0.6:          return "Lichtgroen"
+        if r > g * 0.6:         return "Lichtgroen"
         return "Donkergroen"
     return "Paars" if r > 150 else ("Lichtblauw" if g > 150 else "Blauw")
 
@@ -345,6 +345,7 @@ def draw_page(
     doc, matrix: np.ndarray, answer_matrix: np.ndarray, exercises: list[tuple],
     user_numbers: dict, cluster_colors: dict,
     show_colors: bool = True, show_answers: bool = False, cfg: PageConfig | None = None,
+    page_number: int | None = None,
 ) -> None:
     """Voeg één pagina toe aan het PDF-document."""
     cfg  = cfg or PageConfig()
@@ -434,6 +435,16 @@ def draw_page(
         draw_exercise(page, ex, cfg.margin + col_width + 4, y + i * cfg.row_height, col_width,
                       cluster_colors, ccw, font_r, font_br, cfg, show_answers)
 
+    # ── Paginanummer ─────────────────────────────────────────────────────────
+    if page_number is not None:
+        pn_text   = str(page_number)
+        pn_fs     = 9
+        pn_w      = _text_len(pn_text, fontname=cfg.measure_font, fontsize=pn_fs)
+        pn_x      = cfg.page_w - cfg.margin - pn_w
+        pn_y      = cfg.page_h - cfg.margin + 20
+        page.insert_text((pn_x, pn_y), pn_text,
+                         fontname=font_r, fontsize=pn_fs, color=(0.5, 0.5, 0.5))
+
 # ── PDF GENEREREN ─────────────────────────────────────────────────────────────
 
 def generate_pdf(
@@ -475,14 +486,20 @@ def generate_pdf(
                 st.warning(ex_warning)
             answer_matrix = populate_matrix(matrix, exercises, num_clusters=num_clusters)
 
+            # Paginanummer = inhoudelijk paginanummer (werkblad en antwoordblad delen hetzelfde)
+            content_page_number = page_num + 1
+
             if show_answers:
                 draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors,
-                          show_colors=False, show_answers=False, cfg=cfg)
+                          show_colors=False, show_answers=False, cfg=cfg,
+                          page_number=content_page_number)
                 draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors,
-                          show_colors=True,  show_answers=True,  cfg=cfg)
+                          show_colors=True,  show_answers=True,  cfg=cfg,
+                          page_number=content_page_number)
             else:
                 draw_page(doc, matrix, answer_matrix, exercises, user_numbers, cluster_colors,
-                          show_colors=show_colors, show_answers=False, cfg=cfg)
+                          show_colors=show_colors, show_answers=False, cfg=cfg,
+                          page_number=content_page_number)
 
         except ValueError as e:
             st.error(str(e))
